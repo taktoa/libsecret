@@ -1,12 +1,15 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE ViewPatterns  #-}
+
 module Main where
 
-import           Control.Monad.IO.Class
-
-import           Data.Bits              (Bits)
 import           Data.Map.Strict        (Map)
-
 import           Data.Text              (Text)
+
+import           Control.Monad.IO.Class (MonadIO)
+import           Data.Bits              (Bits)
 import           Foreign.Storable       (Storable)
+import           GHC.Generics           (Generic)
 
 import qualified Data.Text              as T
 import qualified Foreign.C              as FFI
@@ -20,13 +23,13 @@ import qualified GI.Secret              as S
 data SchemaFlag
   = SchemaNone
   | SchemaDontMatchName
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 data SchemaAttr
   = SchemaAttrStr  !Text !Text
   | SchemaAttrInt  !Text !Int
   | SchemaAttrBool !Text !Bool
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 schemaAttrName :: SchemaAttr -> Text
 schemaAttrName (SchemaAttrStr  name _) = name
@@ -51,10 +54,39 @@ data Schema
     , schemaFlags :: [SchemaFlag]
     , schemaAttrs :: [SchemaAttr]
     }
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
-passwordStore :: _
-passwordStore = _
+type Label = Text
+type Password = Text
+type Collection = Maybe Text
+type Attributes = Map Text Text
+
+toGSecretSchema :: Schema -> S.Schema
+toGSecretSchema = _
+
+data StoreInfo
+  = MkStoreInfo
+    { storeInfoSchema     :: S.Schema
+    , storeInfoAttributes :: Map Text Text
+    , storeInfoCollection :: Maybe Text
+    }
+
+makeStoreInfo :: Schema -> Attributes -> Collection -> StoreInfo
+makeStoreInfo (toGSecretSchema -> sch) attrs coll = MkStoreInfo sch attrs coll
+
+-- | Store a password with libsecret.
+--
+-- FIXME: more docs
+--
+-- Note that this function is synchronous; if you want asynchrony, wrap this
+-- call with 'Control.Concurrent.Async.async'.
+passwordStore :: (MonadIO io)
+              => StoreInfo
+              -> Label
+              -> Password
+              -> io ()
+passwordStore (MkStoreInfo sch attrs coll) label pw
+  = S.passwordStoreSync sch attrs coll label pw G.noCancellable
 
 main :: IO ()
 main = pure ()
